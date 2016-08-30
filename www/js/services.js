@@ -1,8 +1,8 @@
 angular.module('starter.services', ['ngResource'])
 
 .factory('SailsAPI', function ($http) {
-    var PICKUPS = "http://localhost:1337/pickup";
-    var BOXES = "http://localhost:1337/box";
+    var PICKUPS = "https://pbox-backend.herokuapp.com/pickup";
+    var BOXES = "https://pbox-backend.herokuapp.com/box";
     
     return {
         getPickups: function() {
@@ -38,52 +38,48 @@ angular.module('starter.services', ['ngResource'])
     }
 })
 
-.factory('Socket', function($rootScope) {
-
-    var service = {};
-    var client = {};
-
-    service.connect = function(host, port, user, password, client) {
-        var options = {
-          username: user,
-          password: password,
-          clientId: client
-        };
-        console.log("Try to connect to MQTT Broker " + host + " with user " + user);
-        client = mqtt.createClient(parseInt(port),host,options);
-        console.log(client);
-        client.subscribe('client/daniavram/in/device/*/asset/100/state'); 
-
-        client.on('connect', function(connectionParam) {
-            console.log('connected');
-        });
+.factory('MqttFilter', function($rootScope) {
+    
+    var _filteredValues = {
+        mqttLat : 0.0,
+        mqttLng : 0.0,
+        mqttTemperature : 0.0,
+        mqttHumidity : 0.0,
+        mqttLight : 0.0,
+        mqttAcceleration : ""
+    };
+    
+    return {
+        filterMessage : function(message) {
+            switch(message.Id) {
+                case "wpfaY8YFhjDtHuhIac85c1vQ":
+                    _filteredValues.mqttLat = message.Value.latitude;
+                    _filteredValues.mqttLng = message.Value.longitude;
+                    console.log('Latitude: ' + _filteredValues.mqttLat + ", Longitude: " + _filteredValues.mqttLng);
+                    break;
+                case "wyeJaLZqQ8sy2jcfyinCijGf":
+                    _filteredValues.mqttTemperature = message.Value;
+                    console.log('Temperature: ' + _filteredValues.mqttTemperature);
+                    break;
+                case "j5zTJqj90NAB4RqRV9r7XTxp":
+                    _filteredValues.mqttHumidity = message.Value;
+                    console.log('Humidity: ' + _filteredValues.mqttHumidity);
+                    break;
+                case "XlA9LN1heDcWbf8EONwIVZut":
+                    _filteredValues.mqttLight = message.Value;
+                    console.log('Light: ' + _filteredValues.mqttLight);
+                    break;
+                case "p47iq4uA0rfXeig8AErTdldh":
+                    _filteredValues.mqttAcceleration = message.Value
+                    console.log('Accelerometer: ' + _filteredValues.mqttAcceleration);
+                    break;
+            }
+            $rootScope.$apply();
+            $rootScope.$emit('mqtt-update', _filteredValues);
+        },
         
-        client.on('error', function(err) {
-            console.log('error!', err);
-            client.stream.end();
-        });
-
-        client.on('message', function (topic, message) {
-          //service.callback(topic,message);
-            console.log('oh, look; a message!');
-//            var boxId = topic.match(/.*?\/(\w+)\/asset\//);
-//            if (boxId != null) {
-//                boxController.boxButtonPressed(boxId[1]);
-//            }
-        });
+        filteredValues: _filteredValues
     }
-
-    service.publish = function(topic, payload) {
-        client.publish(topic,payload, {retain: true});
-        console.log('publish-Event sent '+ payload + ' with topic: ' + topic + ' ' + client);
-    }
-
-    service.onMessage = function(callback) {
-        console.log('some message');
-        service.callback = callback;
-    }
-
-    return service;
 })
 
 ;

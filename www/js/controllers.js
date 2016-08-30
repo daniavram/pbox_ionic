@@ -173,8 +173,8 @@ angular.module('starter.controllers', ['starter.services', 'ionic', 'ngTouch', '
         SailsAPI.removePickup(itemId).then(
             function(successParam) {
                 //nobody cares when everything goes smoothly
-                if (successParam.data == "Cannot delete Pickup") {
-                    alert("Cannot delete Pickup");
+                if (typeof successParam.data === 'string') {
+                    alert(successParam.data);
                 } else {
                     SailsAPI.getPickups().then(function(results) {
                         $scope.pickups = results.data;
@@ -211,16 +211,20 @@ angular.module('starter.controllers', ['starter.services', 'ionic', 'ngTouch', '
         $scope.pickup = result.data;
     });
     
+        
+    
     $scope.removeBoxFromPickup = function(boxIdParam) {
         SailsAPI.removeBoxFromPickup($scope.pickup.id, boxIdParam).then(
             function(successParam) {
                 //In brightest day or blackest night, no evil shall escape my sight
-                SailsAPI.getPickupById($stateParams.pickupId).then(function(result) {
-                    $scope.pickup = result.data;
-                });
+                if (typeof successParam.data === 'object') {
+                    $scope.pickup = successParam.data;
+                } else {
+                    alert(successParam.data);
+                }
             },
             function(failureParam) {
-                
+                console.log(failureParam);
             }
         );
     };
@@ -241,12 +245,14 @@ angular.module('starter.controllers', ['starter.services', 'ionic', 'ngTouch', '
     
     $scope.attachBox = function(boxIdParam) {
         SailsAPI.attachBoxToPickup($scope.pickup.id, boxIdParam).then(
-            function(successParams) {
+            function(successParam) {
                 //this one's for that ice-cold Michelle Pfeiffer, that white gold
+                if (typeof successParam.data === 'object') {
+                    $scope.pickup = successParam.data;
+                } else {
+                    alert(successParam.data);
+                }
                 $scope.closeAttachNewBoxModal();
-                SailsAPI.getPickupById($stateParams.pickupId).then(function(result) {
-                    $scope.pickup = result.data;
-                });
             },
             function(failureParam){
                 alert('Box not added to Pickup');
@@ -317,8 +323,14 @@ angular.module('starter.controllers', ['starter.services', 'ionic', 'ngTouch', '
     };
     
     $scope.removeItem = function(itemId) {
-        SailsAPI.removeBox(itemId).then(function(succesParam) {
-            $scope.refreshBoxes();
+        SailsAPI.removeBox(itemId).then(function(successParam) {
+            if (typeof successParam.data === 'string') {
+                alert(successParam.data);
+            } else {
+                SailsAPI.getBoxes().then(function(results) {
+                    $scope.boxes = results.data;
+                });
+            }
         });
     };
     
@@ -340,16 +352,17 @@ angular.module('starter.controllers', ['starter.services', 'ionic', 'ngTouch', '
     
 })
 
-.controller('BoxCtrl', function($scope, $stateParams, SailsAPI, $cordovaGeolocation) {
+.controller('BoxCtrl', function($scope, $stateParams, SailsAPI, $cordovaGeolocation, MqttFilter, $rootScope) {
+    
+    $scope.filteredValues = MqttFilter.filteredValues;
+    
     SailsAPI.getBoxById($stateParams.boxId).then(function(result) {
         $scope.box = result.data;
     });
-    
-    var latFromMqtt = 46.190999;
-    var longFromMqtt = 21.300707;
-    var options = {timeout: 10000, enableHighAccuracy: true};
-    var latLng = new google.maps.LatLng(latFromMqtt, longFromMqtt);
 
+    var latLng = new google.maps.LatLng($scope.filteredValues.mqttLat, $scope.filteredValues.mqttLng);
+    var marker = null;
+        
     var mapOptions = {
         center: latLng,
         zoom: 18,
@@ -357,13 +370,24 @@ angular.module('starter.controllers', ['starter.services', 'ionic', 'ngTouch', '
     };
 
     $scope.map = new google.maps.Map(document.getElementById("map"), mapOptions);
-        
     google.maps.event.addListenerOnce($scope.map, 'idle', function(){
-        var marker = new google.maps.Marker({
+        marker = new google.maps.Marker({
             map: $scope.map,
             animation: google.maps.Animation.DROP,
             position: latLng
         });
+    });
+    
+    $rootScope.$on('mqtt-update', function(event, object) {
+        latLng = new google.maps.LatLng($scope.filteredValues.mqttLat, $scope.filteredValues.mqttLng);
+        marker.setMap(null);
+        marker = new google.maps.Marker({
+            map: $scope.map,
+            animation: google.maps.Animation.DROP,
+            position: latLng
+        });
+        $scope.map.setCenter(marker.getPosition());
+        $scope.map.setZoom(8);
     });
 })
 ;
