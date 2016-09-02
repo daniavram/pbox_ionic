@@ -1,7 +1,7 @@
 angular.module('starter.controllers', ['starter.services', 'ionic', 'ngTouch', 'google.places', 'starter.directives'])
 
 
-.controller('AppCtrl', function($scope, $ionicModal, $timeout) {
+.controller('AppCtrl', function($scope, $ionicModal, $timeout, $rootScope) {
 
   // With the new view caching in Ionic, Controllers are only called
   // when they are recreated or on app start, instead of every page change.
@@ -11,42 +11,27 @@ angular.module('starter.controllers', ['starter.services', 'ionic', 'ngTouch', '
   //});
 
   // Form data for the login modal
-  $scope.loginData = {};
+    
+  
 
-  // Create the login modal that we will use later
-  $ionicModal.fromTemplateUrl('templates/login.html', {
-    scope: $scope
-  }).then(function(modal) {
-    $scope.modal = modal;
-  });
-
-  // Triggered in the login modal to close it
-  $scope.closeLogin = function() {
-    $scope.modal.hide();
-  };
-
-  // Open the login modal
-  $scope.login = function() {
-    $scope.modal.show();
-  };
-
-  // Perform the login action when the user submits the login form
-  $scope.doLogin = function() {
-    console.log('Doing login', $scope.loginData);
-
-    // Simulate a login delay. Remove this and replace with your login
-    // code if using a login system
-    $timeout(function() {
-      $scope.closeLogin();
-    }, 1000);
-  };
 })
 
-.controller('PickupsCtrl', function($scope, $ionicModal, SailsAPI, $cordovaGeolocation, $http) {
+.controller('UserChooserCtrl', function($scope, $rootScope) {
+    $scope.chooseUser = function(userType) {
+        $rootScope.userType = userType;
+    };
+})
+
+.controller('PickupsCtrl', function($scope, $ionicModal, SailsAPI, $cordovaGeolocation, $http, MqttFilter) {
     SailsAPI.getPickups().then(function(results) {
         $scope.pickups = results.data;
+        $scope.$broadcast('pickups-received', null);
     });
     $scope.gPlace;
+    
+    $scope.$on('pickups-received', function (event, value) {
+        subscribeToAllBoxes();
+    });    
     
     var geocoder = new google.maps.Geocoder;
     var geocoderOptions = {timeout: 10000, enableHighAccuracy: true, language: 'en'};
@@ -91,6 +76,37 @@ angular.module('starter.controllers', ['starter.services', 'ionic', 'ngTouch', '
             });
         });
     };
+    
+    function subscribeToAllBoxes() {
+        for (pickupsIt of $scope.pickups) {
+            for (boxesIt of pickupsIt.boxes) {
+                if (MqttFilter.mqttValues[boxesIt.boxId]) {
+                    //do nothing
+                } else {
+                    var builder = {};
+                    builder[boxesIt.gpsAssetId] = {mqttLat: 0.0, mqttLng: 0.0};
+                    builder[boxesIt.temperatureAssetId] = {mqttTemperature: 0.0};
+                    builder[boxesIt.humidityAssetId] = {mqttHumidity: 0.0};
+                    builder[boxesIt.lightAssetId] = {mqttLight: 0.0};
+                    builder[boxesIt.accelerometerAssetId] = {mqttAcceleration: 0.0};
+                    
+                    MqttFilter.mqttValues[boxesIt.boxId] = builder;
+                    
+                    subscribeToBox(boxesIt);
+                }
+            }
+        }
+        console.log(MqttFilter.mqttValues);
+    };
+    
+    function subscribeToBox(box) {
+        CappMessaging.subscribe(
+            'client.daniavram.in.device.' + box.boxId + '.#',
+            function(callbackMessage) {
+                MqttFilter.filterValues(callbackMessage, box);
+            }
+        );
+    }
 	
     $scope.closeAddPickupModal = function() {
         $scope.addPickupModal.remove();
@@ -173,12 +189,12 @@ angular.module('starter.controllers', ['starter.services', 'ionic', 'ngTouch', '
         SailsAPI.removePickup(itemId).then(
             function(successParam) {
                 //nobody cares when everything goes smoothly
-                if (typeof successParam.data === 'string') {
-                    alert(successParam.data);
-                } else {
+                if (typeof successParam.data === 'object') {
                     SailsAPI.getPickups().then(function(results) {
                         $scope.pickups = results.data;
                     });
+                } else if (typeof successParam.data === 'string') {
+                    alert(successParam.data);
                 }
             },
             function(failureParam) {
@@ -197,6 +213,7 @@ angular.module('starter.controllers', ['starter.services', 'ionic', 'ngTouch', '
         SailsAPI.getPickups()
             .then(function(results) {
                 $scope.pickups = results.data;
+                $scope.$broadcast('pickups-received', null);
             })
             .finally(function() {
                 // Stop the ion-refresher from spinning
@@ -205,13 +222,13 @@ angular.module('starter.controllers', ['starter.services', 'ionic', 'ngTouch', '
     };
 })
 
-.controller('PickupCtrl', function($scope, $stateParams, SailsAPI, $ionicModal, $state, $timeout) {    
+.controller('PickupCtrl', function($scope, $stateParams, SailsAPI, $ionicModal, $state, $timeout, MqttFilter, $rootScope) {
+    
+    $scope.userType = $rootScope.userType;
     
     SailsAPI.getPickupById($stateParams.pickupId).then(function(result) {
         $scope.pickup = result.data;
     });
-    
-        
     
     $scope.removeBoxFromPickup = function(boxIdParam) {
         SailsAPI.removeBoxFromPickup($scope.pickup.id, boxIdParam).then(
@@ -219,7 +236,9 @@ angular.module('starter.controllers', ['starter.services', 'ionic', 'ngTouch', '
                 //In brightest day or blackest night, no evil shall escape my sight
                 if (typeof successParam.data === 'object') {
                     $scope.pickup = successParam.data;
-                } else {
+                    delete MqttFilter.mqttValues[boxIdParam];
+                    console.log(MqttFilter.mqttValues);
+                } else if (typeof successParam.data === 'string') {
                     alert(successParam.data);
                 }
             },
@@ -354,32 +373,52 @@ angular.module('starter.controllers', ['starter.services', 'ionic', 'ngTouch', '
 
 .controller('BoxCtrl', function($scope, $stateParams, SailsAPI, $cordovaGeolocation, MqttFilter, $rootScope) {
     
-    $scope.filteredValues = MqttFilter.filteredValues;
-    
     SailsAPI.getBoxById($stateParams.boxId).then(function(result) {
         $scope.box = result.data;
+        $scope.$broadcast('box-received', $scope.box);
     });
-
-    var latLng = new google.maps.LatLng($scope.filteredValues.mqttLat, $scope.filteredValues.mqttLng);
+    
     var marker = null;
+    
+    $scope.$on('box-received', function(event, box) {
         
-    var mapOptions = {
-        center: latLng,
-        zoom: 18,
-        mapTypeId: google.maps.MapTypeId.ROADMAP
-    };
+        $scope.mqttValues = MqttFilter.mqttValues;
+        var lat = 0.0;
+        var lng = 0.0;
+        
+        if ($scope.mqttValues[box.boxId] && $scope.mqttValues[box.boxId][box.gpsAssetId].mqttLat && $scope.mqttValues[box.boxId][box.gpsAssetId].mqttLng) {
+            lat = $scope.mqttValues[box.boxId][box.gpsAssetId].mqttLat;
+            lng = $scope.mqttValues[box.boxId][box.gpsAssetId].mqttLng;
+        }
 
-    $scope.map = new google.maps.Map(document.getElementById("map"), mapOptions);
-    google.maps.event.addListenerOnce($scope.map, 'idle', function(){
+        var latLng = new google.maps.LatLng(lat, lng);
         marker = new google.maps.Marker({
             map: $scope.map,
             animation: google.maps.Animation.DROP,
             position: latLng
         });
+
+        var mapOptions = {
+            center: latLng,
+            zoom: 18,
+            mapTypeId: google.maps.MapTypeId.ROADMAP
+        };
+
+        $scope.map = new google.maps.Map(document.getElementById("map"), mapOptions);
+        google.maps.event.addListenerOnce($scope.map, 'idle', function(){
+            marker = new google.maps.Marker({
+                map: $scope.map,
+                animation: google.maps.Animation.DROP,
+                position: latLng
+            });
+        });
+        $scope.map.setCenter(marker.getPosition());
+        $scope.map.setZoom(9);
     });
+        
     
-    $rootScope.$on('mqtt-update', function(event, object) {
-        latLng = new google.maps.LatLng($scope.filteredValues.mqttLat, $scope.filteredValues.mqttLng);
+    $rootScope.$on('mqtt-location-update-' + $stateParams.boxId, function(event, box) {
+        latLng = new google.maps.LatLng($scope.mqttValues[box.boxId][box.gpsAssetId].mqttLat, $scope.mqttValues[box.boxId][box.gpsAssetId].mqttLng);
         marker.setMap(null);
         marker = new google.maps.Marker({
             map: $scope.map,
@@ -387,7 +426,7 @@ angular.module('starter.controllers', ['starter.services', 'ionic', 'ngTouch', '
             position: latLng
         });
         $scope.map.setCenter(marker.getPosition());
-        $scope.map.setZoom(8);
+        $scope.map.setZoom(9);
     });
 })
 ;

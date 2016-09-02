@@ -18,12 +18,15 @@
     </ion-header-bar>
     <ion-content>
       <ion-list>
+        <ion-item menu-close href="#/app/userChooser">
+          User Chooser
+        </ion-item>
         <ion-item menu-close href="#/app/pickups">
           Pickups
         </ion-item>
-        <ion-item menu-close href="#/app/boxes">
+        <ion-item ng-if="userType == 'Admin'" menu-close href="#/app/boxes">
           Boxes
-        </ion-item>
+        </ion-item>  
         <ion-item menu-close href="#/app/about">
           About
         </ion-item>

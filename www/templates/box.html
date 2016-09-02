@@ -1,20 +1,17 @@
 <ion-view view-title="Box">
     <ion-content>
-        <ion-refresher
-            pulling-text="Pull to refresh..." on-refresh="">
-        </ion-refresher>
         <div class="list card">
             <div class="item item-text-wrap">
                 <h1>{{box.boxId}}</h1>
                 <h3>Being delivered: {{box.isBeingDelivered}}</h3>
             </div>
             <div class="item">
-                <h3>Temperature: {{filteredValues.mqttTemperature}}</h3>
-                <h3>Humidity: {{filteredValues.mqttHumidity}}</h3>
-                <h3>Light: {{filteredValues.mqttLight}}</h3>
-                <h3>Orientation: {{filteredValues.mqttAcceleration}}</h3>
-                <h3>Box Latitude: {{filteredValues.mqttLat}}</h3>
-                <h3>Box Longitude: {{filteredValues.mqttLng}}</h3>
+                <h3>Temperature: {{mqttValues[box.boxId][box.temperatureAssetId].mqttTemperature}}</h3>
+                <h3>Humidity: {{mqttValues[box.boxId][box.humidityAssetId].mqttHumidity}}</h3>
+                <h3>Light: {{mqttValues[box.boxId][box.lightAssetId].mqttLight}}</h3>
+                <h3>Orientation: {{mqttValues[box.boxId][box.accelerometerAssetId].mqttAcceleration}}</h3>
+                <h3>Box Latitude: {{mqttValues[box.boxId][box.gpsAssetId].mqttLat}}</h3>
+                <h3>Box Longitude: {{mqttValues[box.boxId][box.gpsAssetId].mqttLng}}</h3>
             </div>
         </div>
         

@@ -6,7 +6,10 @@
 // 'starter.controllers' is found in controllers.js
 angular.module('starter', ['ionic', 'starter.controllers', 'ngCordova'])
 
-.run(function($ionicPlatform, MqttFilter) {
+.run(function($ionicPlatform, MqttFilter, $rootScope) {
+    
+    $rootScope.userType = 'Mortal';
+    
     $ionicPlatform.ready(function() {
         // Hide the accessory bar by default (remove this to show the accessory bar above the keyboard
         // for form inputs)
@@ -22,11 +25,6 @@ angular.module('starter', ['ionic', 'starter.controllers', 'ngCordova'])
     });
     
     CappMessaging.connect();
-    CappMessaging.subscribe(
-        'client.daniavram.in.device.#',
-        function(callbackMessage) {
-            MqttFilter.filterMessage(callbackMessage);
-        });
     
 })
 
@@ -41,7 +39,17 @@ angular.module('starter', ['ionic', 'starter.controllers', 'ngCordova'])
     templateUrl: 'templates/menu.html',
     controller: 'AppCtrl'
   })
-
+  
+  .state('app.userChooser', {
+      url: '/userChooser',
+      views: {
+        'menuContent': {
+          templateUrl: 'templates/userChooser.html',
+          controller: 'UserChooserCtrl'
+        }
+      }
+  })
+  
   .state('app.pickups', {
       url: '/pickups',
       views: {
@@ -91,7 +99,7 @@ angular.module('starter', ['ionic', 'starter.controllers', 'ngCordova'])
       }
     });
   // if none of the above states are matched, use this as the fallback
-  $urlRouterProvider.otherwise('/app/pickups');
+  $urlRouterProvider.otherwise('/app/userChooser');
 })
 
 ;

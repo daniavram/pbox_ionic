@@ -40,45 +40,38 @@ angular.module('starter.services', ['ngResource'])
 
 .factory('MqttFilter', function($rootScope) {
     
-    var _filteredValues = {
-        mqttLat : 0.0,
-        mqttLng : 0.0,
-        mqttTemperature : 0.0,
-        mqttHumidity : 0.0,
-        mqttLight : 0.0,
-        mqttAcceleration : ""
-    };
+    var _mqttValues = {};
     
     return {
-        filterMessage : function(message) {
+        filterValues : function(message, box) {
             switch(message.Id) {
-                case "wpfaY8YFhjDtHuhIac85c1vQ":
-                    _filteredValues.mqttLat = message.Value.latitude;
-                    _filteredValues.mqttLng = message.Value.longitude;
-                    console.log('Latitude: ' + _filteredValues.mqttLat + ", Longitude: " + _filteredValues.mqttLng);
+                case box.gpsAssetId:
+                    _mqttValues[box.boxId][box.gpsAssetId].mqttLat = message.Value.latitude;
+                    _mqttValues[box.boxId][box.gpsAssetId].mqttLng = message.Value.longitude;
+                    $rootScope.$emit('mqtt-location-update-' + box.boxId, box);
+//                    console.log('Latitude: ' + _mqttValues[box.boxId][box.gpsAssetId].mqttLat + ", Longitude: " + _mqttValues[box.boxId][box.gpsAssetId].mqttLng);
                     break;
-                case "wyeJaLZqQ8sy2jcfyinCijGf":
-                    _filteredValues.mqttTemperature = message.Value;
-                    console.log('Temperature: ' + _filteredValues.mqttTemperature);
+                case box.temperatureAssetId:
+                    _mqttValues[box.boxId][box.temperatureAssetId].mqttTemperature = message.Value;
+//                    console.log('Temperature: ' + _mqttValues[box.boxId][box.temperatureAssetId].mqttTemperature);
                     break;
-                case "j5zTJqj90NAB4RqRV9r7XTxp":
-                    _filteredValues.mqttHumidity = message.Value;
-                    console.log('Humidity: ' + _filteredValues.mqttHumidity);
+                case box.humidityAssetId:
+                    _mqttValues[box.boxId][box.humidityAssetId].mqttHumidity = message.Value;
+//                    console.log('Humidity: ' + _mqttValues[box.boxId][box.humidityAssetId].mqttHumidity);
                     break;
-                case "XlA9LN1heDcWbf8EONwIVZut":
-                    _filteredValues.mqttLight = message.Value;
-                    console.log('Light: ' + _filteredValues.mqttLight);
+                case box.lightAssetId:
+                    _mqttValues[box.boxId][box.lightAssetId].mqttLight = message.Value;
+//                    console.log('Light: ' + _mqttValues[box.boxId][box.lightAssetId].mqttLight);
                     break;
-                case "p47iq4uA0rfXeig8AErTdldh":
-                    _filteredValues.mqttAcceleration = message.Value
-                    console.log('Accelerometer: ' + _filteredValues.mqttAcceleration);
+                case box.accelerometerAssetId:
+                    _mqttValues[box.boxId][box.accelerometerAssetId].mqttAcceleration = message.Value;
+//                    console.log('Acceleration: ' + _mqttValues[box.boxId][box.accelerometerAssetId].mqttAcceleration);
                     break;
             }
             $rootScope.$apply();
-            $rootScope.$emit('mqtt-update', _filteredValues);
         },
         
-        filteredValues: _filteredValues
+        mqttValues: _mqttValues
     }
 })
 
